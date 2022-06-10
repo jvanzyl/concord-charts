@@ -1,0 +1,22 @@
+expose:
+  type: ingress
+  ingress:
+    host: localhost
+  tls:
+    enabled: false
+agent:
+  resources:
+    requests:
+      cpu: 1
+      memory: 256M
+    limits:
+      cpu: 2
+      memory: 512M
+dind:
+  resources:
+    requests:
+      cpu: 1
+      memory: 256M
+    limits:
+      cpu: 2
+      memory: 512M

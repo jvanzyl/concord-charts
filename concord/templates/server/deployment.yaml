@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: concord-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: concord-server
+  template:
+    metadata:
+      labels:
+        app: concord-server
+    spec:
+      serviceAccountName: {{ template "concord.serviceAccountName" . }}            
+      {{- include "imagePullSecretName" . | nindent 6 }}
+      # https://medium.com/@xcoulon/initializing-containers-in-order-with-kubernetes-18173b9cc222
+      initContainers:
+      - name: postgres-ready
+        image: {{ .Values.database.internal.image.repository }}:{{ .Values.database.internal.image.tag }}
+        command: ['sh', '-c', 'until pg_isready -h postgresql -p 5432; do echo waiting for database; sleep 2; done; sleep 10;']      
+      containers:
+        - name: concord-server
+          {{- if .Values.serverImageOverride }}
+          image: {{ .Values.serverImageOverride }}
+          {{- else }}
+          image: {{ .Values.registry }}/{{ .Values.serverImageName }}:{{ .Values.version }}
+          {{- end }}
+          imagePullPolicy: "{{ .Values.imagePullPolicy }}"
+          volumeMounts:
+            - name: cfg
+              mountPath: "/opt/concord/conf/server.conf"
+              subPath: server.conf
+            - name: cfg
+              mountPath: "/opt/concord/conf/mvn.json"
+              subPath: mvn.json
+            - name: cfg
+              mountPath: "/opt/concord/console/cfg.js"
+              subPath: cfg.js
+          ports:
+            - containerPort: 8001
+          env:
+            - name: CONCORD_CFG_FILE
+              value: /opt/concord/conf/server.conf
+            - name: CONCORD_MAVEN_CFG
+              value: "/opt/concord/conf/mvn.json"
+            {{- range $key, $val := .Values.server.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
+      volumes:
+        - name: cfg
+          configMap:
+            name: server-cfg
